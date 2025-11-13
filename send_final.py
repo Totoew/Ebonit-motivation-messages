@@ -5,6 +5,7 @@ import os
 import io
 import matplotlib
 import getpass
+import pymorphy2
 
 from grafik import create_detailed_graph
 
@@ -16,6 +17,62 @@ from static_data import motivation_videos, future_wishes, quotes
 EXCEL_FILE = '/Users/daniltotoev/Downloads/Новая таблица.xlsx'
 
 # --- Вспомогательные функции ---
+def detect_gender(full_name):
+    """
+    Определяет пол по окончанию имени/отчества
+    """
+    if pd.isna(full_name) or not isinstance(full_name, str):
+        return "unknown"
+
+    name_parts = full_name.strip().split()
+
+    # Проверяем окончания
+    for part in name_parts:
+        if part.endswith(('ова', 'ева', 'ина', 'ская', 'цкая')):
+            return "female"
+        elif part.endswith(('ов', 'ев', 'ин', 'ский', 'цкий')):
+            return "male"
+
+    # Если не определили по фамилии, проверяем имя
+    first_name = name_parts[0] if name_parts else ""
+    female_endings = ('а', 'я', 'ья')
+    male_endings = ('й', 'ь', 'н', 'р', 'т')
+
+    if first_name.endswith(female_endings):
+        return "female"
+    elif first_name.endswith(male_endings):
+        return "male"
+
+    return "unknown"
+
+def confirm_action(message="Продолжить?"):
+    """
+    Запрос подтверждения у пользователя
+    """
+    print(f"\n⚠️  {message}")
+    print("1 - Да, продолжить")
+    print("2 - Нет, отменить")
+
+    while True:
+        choice = input("Ваш выбор (1/2): ").strip()
+        if choice == "1":
+            return True
+        elif choice == "2":
+            return False
+        else:
+            print("❌ Неверный выбор. Введите 1 или 2")
+
+def adapt_wish_by_gender(wish_text, gender):
+    """
+    Адаптирует текст пожелания под пол ученика
+    """
+    if gender == "male":
+        return wish_text.replace('стал(а)', 'стал').replace('подготовился(лась)', 'подготовился').replace('уверен(а)', 'уверен')
+    elif gender == "female":
+        return wish_text.replace('стал(а)', 'стала').replace('подготовился(лась)', 'подготовилась').replace('уверен(а)', 'уверена')
+    else:
+        return wish_text  # Оставляем оба варианта если пол не определили
+
 def get_vk_token_gui():
     """
     Для GUI версии - токен передаётся как параметр
@@ -79,38 +136,49 @@ def get_best_hw_info(headers, hw_columns, student_scores, max_scores, lesson_num
    return avg_percent, best_entries
 
 def build_message_for_student(
-       name, category, block_number, hw_count,
-       test_done_count, test_total_count,
-       avg_percent, best_hw_str, lives
+        name, full_name, category, block_number, hw_count,
+        test_done_count, test_total_count,
+        avg_percent, best_hw_str, lives
 ):
-   quote = quotes[block_number - 1].format(name=name) if block_number <= len(quotes) else quotes[0].format(name=name)
-   wish = future_wishes[block_number] if block_number < len(future_wishes) else future_wishes[1]
-   video_url = motivation_videos[block_number - 1].strip() if block_number <= len(motivation_videos) else \
-   motivation_videos[0].strip()
+    # ⭐⭐ ПРАВИЛЬНАЯ ИНДЕКСАЦИЯ ДЛЯ 9 ЭЛЕМЕНТОВ ⭐⭐
+    quote_index = block_number - 1
+    wish_index = block_number - 1
+    video_index = block_number - 1
 
-   lives_message = "Ни одной жизни не потеряно! 🚘" if lives == 3 else f"Количество жизней: {lives}/3"
-   template = load_template(category)
-   message_text = template.format(
-       BLOCK_NUMBER=block_number,
-       HW_COUNT=hw_count,
-       TEST_DONE_COUNT=test_done_count,
-       TEST_TOTAL_COUNT=test_total_count,
-       AVG_HARD_SCORE=f"{avg_percent}%",
-       BEST_HW_BLOCK=best_hw_str,
-       LIVES=lives,
-       LIVES_MESSAGE=lives_message
-   )
-   return f"{quote}\n\n{message_text}\n\n{wish}", video_url  # Возвращаем кортеж (текст, ссылка)
+    # Защита от выхода за границы массивов
+    quote_index = min(quote_index, len(quotes) - 1)
+    wish_index = min(wish_index, len(future_wishes) - 1)
+    video_index = min(video_index, len(motivation_videos) - 1)
+
+    quote = quotes[quote_index].format(name=name)
+    wish = future_wishes[wish_index]
+    video_url = motivation_videos[video_index].strip()
+
+    gender = detect_gender(full_name)
+    wish = adapt_wish_by_gender(wish, gender)
+
+    lives_message = "Ни одной жизни не потеряно! 🚘" if lives == 3 else f"Количество жизней: {lives}/3"
+    template = load_template(category)
+    message_text = template.format(
+        BLOCK_NUMBER=block_number,
+        HW_COUNT=hw_count,
+        TEST_DONE_COUNT=test_done_count,
+        TEST_TOTAL_COUNT=test_total_count,
+        AVG_HARD_SCORE=f"{avg_percent}%",
+        BEST_HW_BLOCK=best_hw_str,
+        LIVES=lives,
+        LIVES_MESSAGE=lives_message
+    )
+    return f"{quote}\n\n{message_text}\n\n{wish}", video_url
 
 def get_curators_vk_ids(df_full):
-   """Читает vk_id куратора из C5 (Excel строка 5 → индекс 4)"""
-   curators = []
-   if len(df_full) > 4:  # есть ли строка 5 (индекс 4)
-       vk_id_raw = df_full.iloc[4, 2]  # C5 → строка 5 → индекс 4, столбец C → индекс 2
-       if pd.notna(vk_id_raw) and str(vk_id_raw).isdigit():
-           curators.append(int(vk_id_raw))
-   return curators
-
+    """Читает vk_id куратора из C5 (Excel строка 5 → индекс 4)"""
+    curators = []
+    if len(df_full) > 4:  # есть ли строка 5 (индекс 4)
+        vk_id_raw = df_full.iloc[4, 2]  # C5 → строка 5 → индекс 4, столбец C → индекс 2
+        if pd.notna(vk_id_raw) and str(vk_id_raw).isdigit():
+            curators.append(int(vk_id_raw))
+    return curators
 
 def get_video_attachment(vk, video_url):
     """
@@ -152,16 +220,13 @@ def get_vk_token():
    if not token.startswith('vk1.a.') or len(token) < 50:
        print("❌ Неверный формат токена. Должен начинаться с 'vk1.a.'")
        return None
-
-
    return token
 
 # --- Режим ПРЕВЬЮ ---
-def preview_mode(vk_token=None, block_number=None, lesson_range=None, curators=None):
+def preview_mode(vk_token=None, block_number=None, lesson_range=None):
     """
     Режим превью с поддержкой GUI
     """
-    # Получение параметров
     if vk_token is None:
         vk_token = get_vk_token()
     if block_number is None:
@@ -171,17 +236,17 @@ def preview_mode(vk_token=None, block_number=None, lesson_range=None, curators=N
     else:
         lesson_input = lesson_range
 
-    # ⭐⭐ УБИРАЕМ ДУБЛИРУЮЩИЙ ЗАПРОС VK ID ⭐⭐
-    # Теперь curators должны передаваться как параметр
-    if curators is None:
-        print("❌ Ошибка: VK ID кураторов не переданы")
+    df_full = pd.read_excel(EXCEL_FILE, header=None)
+    curators = get_curators_vk_ids(df_full)
+
+    if not curators:
+        print("❌ Не найдены vk_id кураторов в C5")
         return
 
     print(f"🎯 Превью будет отправлено кураторам: {curators}")
 
     target_lessons = parse_lesson_range(lesson_input)
 
-    df_full = pd.read_excel(EXCEL_FILE, header=None)
     headers = df_full.iloc[0]
     max_scores_row = df_full.iloc[6]
     student_rows = list(df_full.iloc[7:].iterrows())
@@ -257,7 +322,7 @@ def preview_mode(vk_token=None, block_number=None, lesson_range=None, curators=N
                                                          lesson_numbers)
             best_hw_str = format_best_hw(best_entries)
             msg_text, video_url = build_message_for_student(
-                name, category, block_number, len(hw_columns),
+                name, full_name, category, block_number, len(hw_columns),  # ⭐⭐ ДОБАВИЛИ full_name ⭐⭐
                 test_done_count, test_total_count,
                 avg_percent, best_hw_str, lives
             )
@@ -355,7 +420,7 @@ def preview_mode(vk_token=None, block_number=None, lesson_range=None, curators=N
 
 def send_mode(vk_token=None, block_number=None, lesson_range=None, skip_rows_input=""):
     """
-    Режим отправки с поддержкой GUI
+    Режим отправки с подтверждением
     """
     # Получение параметров
     if vk_token is None:
@@ -402,11 +467,58 @@ def send_mode(vk_token=None, block_number=None, lesson_range=None, skip_rows_inp
     lesson_numbers = list(lesson_numbers)
     hw_columns = list(hw_columns)
 
-    print(f"📤 Будет обработано учеников: {len(student_rows)}")
-    if skip_rows:
-        print(f"🚫 Пропускаем строки Excel: {sorted(skip_rows)}")
+    # Подготовка списка студентов для отправки
+    students_to_process = []
+    for original_idx, row in student_rows:
+        excel_row_number = original_idx + 1
+        if excel_row_number in skip_rows:
+            continue
 
-    # Подключение ВК
+        full_name = row.iloc[1]
+        vk_id_raw = row.iloc[2]
+
+        if pd.isna(vk_id_raw) or not str(vk_id_raw).isdigit():
+            continue
+
+        students_to_process.append((original_idx, row, excel_row_number))
+
+    total_students = len(students_to_process)
+    total_messages = total_students * 2
+
+    print("\n" + "=" * 50)
+    print("📊 СТАТИСТИКА ОТПРАВКИ")
+    print("=" * 50)
+    print(f"👥 Всего учеников: {total_students}")
+    print(f"📨 Всего сообщений: {total_messages} (текст + видео)")
+    print(f"🚫 Пропущено строк: {len(skip_rows)}")
+
+    if students_to_process:
+        print("\n📋 Первые 5 учеников для отправки:")
+        for i, (_, row, excel_row) in enumerate(students_to_process[:5]):
+            name = extract_name(row.iloc[1])
+            vk_id = row.iloc[2]
+            print(f"  {i + 1}. {name} (VK ID: {vk_id}, строка Excel: {excel_row})")
+
+        if total_students > 5:
+            print(f"  ... и еще {total_students - 5} учеников")
+
+    # ЗАПРОС ПОДТВЕРЖДЕНИЯ
+    print(f"\n⚠️  ТОЧНО ОТПРАВИТЬ СООБЩЕНИЯ {total_students} УЧЕНИКАМ?")
+    print("1 - Да, продолжить отправку")
+    print("2 - Нет, отменить")
+
+    while True:
+        choice = input("Ваш выбор (1/2): ").strip()
+        if choice == "1":
+            break
+        elif choice == "2":
+            print("❌ Отправка отменена пользователем")
+            return
+        else:
+            print("❌ Неверный выбор. Введите 1 или 2")
+
+    print("🔄 Начинаю отправку...")
+
     if not vk_token:
         print("❌ Не задан VK_TOKEN")
         return
@@ -416,22 +528,12 @@ def send_mode(vk_token=None, block_number=None, lesson_range=None, skip_rows_inp
     vk = vk_session.get_api()
 
     sent_count = 0
-    for original_idx, row in student_rows:
-        excel_row_number = original_idx + 1
-        if excel_row_number in skip_rows:
-            print(f"⏩ Пропущен: строка {excel_row_number}")
-            continue
-
+    for original_idx, row, excel_row_number in students_to_process:
         full_name = row.iloc[1]
         vk_id_raw = row.iloc[2]
-        lives_raw = row.iloc[4]
-
-        if pd.isna(vk_id_raw) or not str(vk_id_raw).isdigit():
-            print(f"⚠️ Пропущен: {full_name} (некорректный vk_id)")
-            continue
-
         vk_id = int(vk_id_raw)
         name = extract_name(full_name)
+        lives_raw = row.iloc[4]
         lives = int(lives_raw) if pd.notna(lives_raw) else 0
 
         student_scores = []
@@ -473,14 +575,16 @@ def send_mode(vk_token=None, block_number=None, lesson_range=None, skip_rows_inp
         avg_percent, best_entries = get_best_hw_info(headers, hw_columns, student_scores, max_scores, lesson_numbers)
         best_hw_str = format_best_hw(best_entries)
         message_text, video_url = build_message_for_student(
-            name, category, block_number, len(hw_columns),
+            name, full_name, category, block_number, len(hw_columns),
             test_done_count, test_total_count,
             avg_percent, best_hw_str, lives
         )
 
         try:
+            # Отправка текстового сообщения
             vk.messages.send(user_id=vk_id, message=message_text, random_id=0)
 
+            # Отправка видео
             video_attach = get_video_attachment(vk, video_url)
             if video_attach:
                 vk.messages.send(

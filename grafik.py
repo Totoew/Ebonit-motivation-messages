@@ -8,10 +8,9 @@ import numpy as np
 import io
 import requests
 import os
-
-# === Настройки ===
 EXCEL_FILE = '/Users/daniltotoev/Downloads/Новая таблица.xlsx'
 VK_TOKEN = "vk1.a.s1sznd8vChzG2Cz4XiD5SQ__txXf9MNJOn6qJYbnqsoa5CVtyGkTQfdMVnxDDXJaK6Krs2BKl0Kvi1EANYHaCp8Q1YWgX-ZLZo_OEjA3dimeimvo2w2Q_7U1Pks1lxGXxWNIoPxxaU8LnJK7wCx_s7xjoFd4OGEtJaR4J4_2VSc9witYessjlxqr8lQEn6h5cBQRjgkxdwlPd-CxkUZv2g"  # ← ЗАМЕНИ!
+#VK_TOKEN = os.getenv('VK_TOKEN')
 
 def extract_lesson_number(header):
     match = re.match(r'^(\d+)', str(header))

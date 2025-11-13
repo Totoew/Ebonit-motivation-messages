@@ -5,10 +5,8 @@ import sys
 import os
 import platform
 
-# Добавляем текущую директорию в путь для импортов
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
-
 
 def clear_screen():
     """Очистка экрана для разных ОС"""
@@ -16,7 +14,6 @@ def clear_screen():
         os.system('cls')
     else:
         os.system('clear')
-
 
 def print_header():
     """Красивый заголовок"""
@@ -26,7 +23,6 @@ def print_header():
     print("Автоматическая отправка мотивационных сообщений")
     print("=" * 50)
     print()
-
 
 def get_input(prompt, required=True):
     """Безопасный ввод данных"""
@@ -42,7 +38,6 @@ def get_input(prompt, required=True):
             sys.exit(0)
         except Exception as e:
             print(f"❌ Ошибка ввода: {e}")
-
 
 def select_excel_file():
     """Выбор файла Excel"""
@@ -69,7 +64,6 @@ def select_excel_file():
     print(f"✅ Файл найден: {os.path.basename(file_path)}")
     return file_path
 
-
 def get_vk_token():
     """Получение VK токена"""
     print("\n🔑 VK API ТОКЕН")
@@ -80,7 +74,6 @@ def get_vk_token():
 
     token = get_input("Введите ваш VK токен: ")
     return token
-
 
 def get_curators_vk_ids():
     """Получение VK ID кураторов для превью"""
@@ -109,7 +102,6 @@ def get_curators_vk_ids():
     print(f"✅ Будут отправлены кураторам: {curators}")
     return curators
 
-
 def get_block_settings():
     """Настройки блока и домашек"""
     print("\n⚙️  НАСТРОЙКИ ОТПРАВКИ")
@@ -120,7 +112,6 @@ def get_block_settings():
 
     return block_number, lessons_range
 
-
 def get_skip_rows():
     """Настройка пропуска строк"""
     print("\n📋 ДОПОЛНИТЕЛЬНЫЕ НАСТРОЙКИ")
@@ -130,7 +121,6 @@ def get_skip_rows():
 
     skip_rows = get_input("Пропустить строки (через запятую): ", required=False)
     return skip_rows
-
 
 def main_menu():
     """Главное меню"""
@@ -145,7 +135,6 @@ def main_menu():
 
     choice = get_input("Ваш выбор (1-4): ")
     return choice
-
 
 def show_help():
     """Показать справку"""
@@ -163,7 +152,7 @@ def show_help():
     print("   • Файл static_data.py с видео и цитатами")
     print()
     print("🔑 VK ТОКЕН:")
-    print("   • Получить: https://vk.com/dev/access_token")
+    print("   • Получить: из сообщества ВК")
     print("   • Нужны права: messages, friends")
     print()
     print("⚙️  РЕЖИМЫ РАБОТЫ:")
@@ -171,7 +160,6 @@ def show_help():
     print("   • ОТПРАВКА - реальная отправка ученикам")
     print()
     input("Нажмите Enter чтобы вернуться в меню...")
-
 
 def run_program():
     """Основная логика программы"""
@@ -194,9 +182,7 @@ def run_program():
         choice = get_input("\nВыберите режим (1-превью, 2-отправка): ")
 
         if choice == "1":
-            # ⭐⭐ ДОБАВЛЯЕМ ВВОД VK ID КУРАТОРОВ ДЛЯ ПРЕВЬЮ ⭐⭐
-            curators = get_curators_vk_ids()
-            preview_mode(vk_token=vk_token, block_number=block_number, lesson_range=lessons_range, curators=curators)
+            preview_mode(vk_token=vk_token, block_number=block_number, lesson_range=lessons_range)
         elif choice == "2":
             skip_rows = get_skip_rows()
             send_mode(vk_token=vk_token, block_number=block_number, lesson_range=lessons_range,
@@ -215,7 +201,6 @@ def run_program():
     except Exception as e:
         print(f"❌ Произошла ошибка: {e}")
         input("\nНажмите Enter чтобы продолжить...")
-
 
 def main():
     """Главная функция"""
@@ -239,7 +224,6 @@ def main():
     except Exception as e:
         print(f"\n❌ Критическая ошибка: {e}")
         input("Нажмите Enter чтобы выйти...")
-
 
 if __name__ == "__main__":
     main()
